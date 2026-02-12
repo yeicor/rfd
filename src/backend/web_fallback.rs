@@ -1223,9 +1223,28 @@ fn create_temp_file_in_dir(
     filename: &str,
     data: &[u8],
 ) -> std::io::Result<PathBuf> {
-    // Use the base directory
-    let path = base_dir.join(filename);
+    // Sanitize the provided filename to prevent path traversal outside `base_dir`.
+    let filename_path = Path::new(filename);
 
+    // Reject absolute paths and any use of `..`, root, or platform-specific prefixes.
+    if filename_path.is_absolute()
+        || filename_path.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid filename",
+        ));
+    }
+
+    // Use the base directory with the sanitized relative path
+    let path = base_dir.join(filename_path);
     // Create parent directories if the filename contains path separators
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
