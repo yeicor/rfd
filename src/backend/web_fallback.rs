@@ -1134,15 +1134,23 @@ async fn file_save_submit(State(state): State<FileSaveState>, body: String) -> H
         if key == "filename" {
             let filename = value.trim();
             if !filename.is_empty() {
-                // Create a path in a temp directory with the chosen filename
-                match tempfile::tempdir() {
-                    Ok(dir) => {
-                        let path = dir.keep().join(filename);
-                        debug!("Web fallback: Save path = {:?}", path);
-                        result = Some(path);
-                    }
-                    Err(e) => {
-                        warn!("Web fallback: Failed to create temp dir: {}", e);
+                // Basic validation to prevent path traversal: disallow separators and ".."
+                if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+                    warn!(
+                        "Web fallback: Rejected unsafe filename from save dialog: {:?}",
+                        filename
+                    );
+                } else {
+                    // Create a path in a temp directory with the chosen filename
+                    match tempfile::tempdir() {
+                        Ok(dir) => {
+                            let path = dir.keep().join(filename);
+                            debug!("Web fallback: Save path = {:?}", path);
+                            result = Some(path);
+                        }
+                        Err(e) => {
+                            warn!("Web fallback: Failed to create temp dir: {}", e);
+                        }
                     }
                 }
             }
